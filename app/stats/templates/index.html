@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <div id="viz"></div>
+
+    <script type="text/javascript">
+      var spec = "{% url 'annual_overview' %}";
+      vegaEmbed('#viz', spec)
+    </script>
+{% endblock %}
