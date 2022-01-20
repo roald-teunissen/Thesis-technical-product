@@ -4,7 +4,6 @@
     <div id="viz"></div>
 
     <script type="text/javascript">
-      var spec = "{% url 'annual_overview' %}";
-      vegaEmbed('#viz', spec)
+      vegaEmbed('#viz', "{% url 'retrieve_graph_data' %}")
     </script>
 {% endblock %}

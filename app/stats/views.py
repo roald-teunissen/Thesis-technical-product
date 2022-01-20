@@ -6,8 +6,16 @@ import duckdb
 import pandas as pd
 from datetime import date
 
-def annual_overview(req):
-    return JsonResponse(retrieve_annual_chart().to_dict(), safe = False)
+def retrieve_graph_data(request):
+    scope = request.GET.get('scope')
+    # tld = request.GET.get('tld')
+
+    if (scope == 'monthly'):
+        data = retrieve_monthly_chart()
+    else:
+        data = retrieve_annual_chart()
+    
+    return JsonResponse(data.to_dict(), safe = False)
 
 def index(request):
     return render(request, 'index.html')

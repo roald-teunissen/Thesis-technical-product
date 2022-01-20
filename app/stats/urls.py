@@ -3,10 +3,5 @@ from . import views
 
 urlpatterns = [
     path('', views.index, name='index'),
-    path('annual_overview/', views.annual_overview, name='annual_overview'),
-        
-    # path('cool_chart/',
-    #         views.my_cool_chart_view,
-    #         name='my-cool-chart'
-    #     ),
+    path('retrieve_graph_data/', views.retrieve_graph_data, name='retrieve_graph_data'),
 ]
