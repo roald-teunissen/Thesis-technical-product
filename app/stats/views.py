@@ -18,7 +18,7 @@ def retrieve_graph_data(request):
     return JsonResponse(data.to_dict(), safe = False)
 
 def index(request):
-    return render(request, 'index.html')
+    return render(request, 'index.html', {'graphDataBaseUrl': 'retrieve_graph_data',})
 
 def retrieve_annual_chart(from_year = 2009, to_year = date.today().year):
     from_year = str(from_year)

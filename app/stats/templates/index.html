@@ -1,9 +1,10 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <div id="viz"></div>
+    <select id="time_scope" onchange="refreshGreencheckChart('{{graphDataBaseUrl}}')">
+      <option value="annually">annually</option>
+      <option value="monthly">monthly</option>   
+    </select>
 
-    <script type="text/javascript">
-      vegaEmbed('#viz', "{% url 'retrieve_graph_data' %}")
-    </script>
+    <div id="greencheck_chart"></div> 
 {% endblock %}
