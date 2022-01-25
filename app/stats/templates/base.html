@@ -1,3 +1,4 @@
+{% load django_htmx %}
 {% load static %}
 
 <!DOCTYPE html>
@@ -18,6 +19,11 @@
         <link href="//fonts.googleapis.com/css?family=Lobster&subset=latin,latin-ext" rel="stylesheet" type="text/css">
     </head>
     <body>
+        <script>
+            document.body.addEventListener('htmx:configRequest', (event) => {
+                event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+            })
+        </script>
         <header class="page-header">
           <div class="container">
               <h1><a href="/">Stats page</a></h1>
@@ -31,5 +37,7 @@
                 </div>
             </div>
         </main>
+        <script src="{% static 'javascript/htmx.js' %}"></script>
+        {% django_htmx_script %}
     </body>
 </html>

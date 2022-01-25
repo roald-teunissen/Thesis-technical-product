@@ -1,10 +1,14 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <select id="time_scope" onchange="refreshGreencheckChart('{{graphDataBaseUrl}}')">
-      <option value="annually">annually</option>
-      <option value="monthly">monthly</option>   
-    </select>
-
-    <div id="greencheck_chart"></div> 
+    <form class="navbar" 
+    method="post" 
+    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' 
+    hx-post="{% url 'index' %}"
+    hx-target="#result">
+      {{ form }}
+      <button>Apply filters</button>
+    </form>
+    <section id="result">
+    </section>
 {% endblock %}

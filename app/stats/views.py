@@ -1,14 +1,17 @@
-import altair as alt
-from django.http import JsonResponse
-from django.shortcuts import render
+from datetime import date
+
 import altair
 import duckdb
 import pandas as pd
-from datetime import date
+from django.http import HttpResponseRedirect, JsonResponse
+from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
+
+from .forms import StatFilterForm
+
 
 def retrieve_graph_data(request):
     scope = request.GET.get('scope')
-    # tld = request.GET.get('tld')
 
     if (scope == 'monthly'):
         data = retrieve_monthly_chart()
@@ -17,16 +20,40 @@ def retrieve_graph_data(request):
     
     return JsonResponse(data.to_dict(), safe = False)
 
+@csrf_exempt
 def index(request):
-    return render(request, 'index.html', {'graphDataBaseUrl': 'retrieve_graph_data',})
+    if request.htmx:
+        # refresh partial template
+        form = StatFilterForm(request.POST or None)
 
-def retrieve_annual_chart(from_year = 2009, to_year = date.today().year):
+        if form.is_valid():
+            time_scope= form.cleaned_data.get("time_scope")
+        else:
+            time_scope = 'annually'
+
+        template_name = "partials/greencheck_graph.html"
+        graph_url = "/retrieve_graph_data/?scope=" + time_scope
+    else:
+        # serve the whole page
+        form = StatFilterForm()
+        template_name = "index.html"
+        graph_url = "/retrieve_graph_data/?scope=annually"
+    
+    return render(request, template_name, {'graphUrl': graph_url, 'form': form})
+
+def retrieve_annual_chart(from_year = 2009, to_year = date.today().year, tld = None):
     from_year = str(from_year)
     to_year = str(to_year)
 
     # Initialize connection with DuckDB and retrieve data
     conn = duckdb.connect()
-    source  = conn.execute("SELECT * FROM './stats/static/datasets/annual.development.parquet' WHERE year >= " + from_year + " AND year <= " + to_year).df()
+    
+    if (tld):
+        query = "SELECT * FROM './stats/static/datasets/annual.development.parquet' WHERE year >= " + from_year + " AND year <= " + to_year + " AND tld = '" + tld + "'"
+    else:
+        query = "SELECT year, green, sum(look_ups) AS look_ups FROM './stats/static/datasets/annual.development.parquet' WHERE year >= " + from_year + " AND year <= " + to_year + " GROUP BY year, green"
+
+    source  = conn.execute(query).df()
 
     # Convert the numbers of lookups to a more readable size
     source['look_ups'] = source['look_ups']/1000000
@@ -58,26 +85,26 @@ def retrieve_annual_chart(from_year = 2009, to_year = date.today().year):
         )
     )
 
-    line = altair.Chart(source[source['green'] == 'yes']).mark_line(stroke = '#5276A7', interpolate = 'monotone').encode(
-        altair.X('year', type='ordinal', 
-                axis = altair.Axis(
-                    labelAngle = 0,
-                    labelAlign = 'center',
-                    labelPadding = 7,
-                    )
-                ),
-        altair.Y('percentage',
-                scale = altair.Scale(domain = (0,100)),
-                axis = altair.Axis(
-                    title = 'Percentage of green domains (%)', 
-                    titleColor = '#5276A7',
-                    grid = True,
-                    orient = 'left',
-                ),
-        ),
-    )
+    # line = altair.Chart(source[source['green'] == 'yes']).mark_line(stroke = '#5276A7', interpolate = 'monotone').encode(
+    #     altair.X('year', type='ordinal', 
+    #             axis = altair.Axis(
+    #                 labelAngle = 0,
+    #                 labelAlign = 'center',
+    #                 labelPadding = 7,
+    #                 )
+    #             ),
+    #     altair.Y('percentage',
+    #             scale = altair.Scale(domain = (0,100)),
+    #             axis = altair.Axis(
+    #                 title = 'Percentage of green domains (%)', 
+    #                 titleColor = '#5276A7',
+    #                 grid = True,
+    #                 orient = 'left',
+    #             ),
+    #     ),
+    # )
 
-    return altair.layer(bar, line).resolve_scale(
+    return altair.layer(bar).resolve_scale(
         y = 'independent'
     ).properties(
         title = "Greencheck annual overview - " + from_year + " to " + to_year,
@@ -100,7 +127,7 @@ def retrieve_annual_chart(from_year = 2009, to_year = date.today().year):
         fontSize = 18,
     )
 
-def retrieve_monthly_chart(from_year = 2017, to_year = date.today().year):
+def retrieve_monthly_chart(from_year = 2009, to_year = date.today().year):
     chart_width = 1000
     column_width = chart_width/(to_year - from_year)
     from_year = str(from_year)
