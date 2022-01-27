@@ -1,14 +1,16 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <form class="navbar" 
-    method="post" 
-    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' 
-    hx-post="{% url 'index' %}"
-    hx-target="#result">
-      {{ form }}
-      <button>Apply filters</button>
-    </form>
-    <section id="result">
-    </section>
+<section class="m-3 px-8 mt-6">
+  <form class="navbar" 
+  method="post" 
+  hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' 
+  hx-post="{% url 'index' %}"
+  hx-target="#result">
+    {{ form }}
+    <button>Apply filters</button>
+  </form>
+  <section id="result">
+  </section>
+</section>
 {% endblock %}
