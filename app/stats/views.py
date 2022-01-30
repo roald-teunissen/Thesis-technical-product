@@ -1,56 +1,85 @@
-import altair as alt
-from django.http import JsonResponse
-from django.shortcuts import render
+from datetime import date
+
 import altair
 import duckdb
 import pandas as pd
-from datetime import date
+import urllib
+from django.http import HttpResponseRedirect, JsonResponse
+from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
+
+from .forms import StatFilterForm
+
 
 def retrieve_graph_data(request):
     scope = request.GET.get('scope')
-    # tld = request.GET.get('tld')
+    tld = request.GET.get('tld')
 
     if (scope == 'monthly'):
-        data = retrieve_monthly_chart()
+        data = retrieve_monthly_chart(tld)
     else:
-        data = retrieve_annual_chart()
+        data = retrieve_annual_chart(tld)
     
     return JsonResponse(data.to_dict(), safe = False)
 
+@csrf_exempt
 def index(request):
-    return render(request, 'index.html')
+    if request.htmx:
+        # Refresh partial template
+        form = StatFilterForm(request.POST or None)
 
-def retrieve_annual_chart(from_year = 2009, to_year = date.today().year):
-    from_year = str(from_year)
-    to_year = str(to_year)
+        if form.is_valid():
+            time_scope = form.cleaned_data.get("time_scope")
+            tld = form.cleaned_data.get("tld")
 
-    # Initialize connection with DuckDB and retrieve data
+        template_name = "partials/greencheck_graph.html"
+        graph_data_url = "/retrieve_graph_data/?" + urllib.parse.urlencode({'scope': time_scope,'tld': tld})
+    else:
+        # Serve the whole page
+        form = StatFilterForm()
+        template_name = "index.html"
+        graph_data_url = "/retrieve_graph_data/?scope=annually"
+    
+    return render(request, template_name, {'graphUrl': graph_data_url, 'form': form})
+
+def retrieve_annual_chart(tld = None):
+    dataset_location = './stats/static/datasets/annual.development.parquet'
+    start_year = '2009'
+    end_year = '2021'
+   
+    if (tld and tld != 'global'):
+        # Query based on Top-Level Domain (TLD)
+        query = "SELECT * FROM '{}' WHERE year >= {} AND year <= {} AND tld = '{}'".format(dataset_location, start_year, end_year, tld)
+        graph_title = "Greencheck annual overview for .{} - {} to {}".format(tld, start_year, end_year),
+    else:
+        # No TLD specified, so query all TLDs
+        query = "SELECT year, green, sum(look_ups) AS look_ups FROM '{}' WHERE year >= {} AND year <= {} GROUP BY year, green".format(dataset_location, start_year, end_year)
+        graph_title = "Greencheck annual overview - {} to {}".format(start_year, end_year),
+
+    # Initialize a connection with DuckDB and retrieve data
     conn = duckdb.connect()
-    source  = conn.execute("SELECT * FROM './stats/static/datasets/annual.development.parquet' WHERE year >= " + from_year + " AND year <= " + to_year).df()
+    source  = conn.execute(query).df()
 
     # Convert the numbers of lookups to a more readable size
     source['look_ups'] = source['look_ups']/1000000
 
     # Build Altair chart
-    base = altair.Chart(source).encode(
-        altair.X('year:O')
-    )
+    base = altair.Chart(source).encode(altair.X('year:O'))
 
-    bar = altair.Chart(source).mark_bar().encode(
-        altair.X('year', 
-                title = 'Years',
-                type = 'ordinal',
-            ),
-        altair.Y('look_ups', 
-                title = 'lookups', 
+    bar_chart = altair.Chart(source).mark_bar().encode(
+        altair.X('year', title = 'Years', type = 'ordinal', 
+                axis = altair.Axis(
+                    labelAngle = 0
+                    )
+                ),
+        altair.Y('look_ups', title = 'lookups', 
                 axis = altair.Axis(
                     title = 'Millions of lookups',
                     titleColor = '#97CE64',
-                    orient = 'right',
+                    # orient = 'right',
                 ),
             ),
-        altair.Color('green', 
-                    title = 'Green',
+        altair.Color('green', title = 'Green',
                     scale = altair.Scale(
                         domain = ['yes', 'no'],
                         range = ['#C3E3A6', '#CECCCA']
@@ -58,31 +87,12 @@ def retrieve_annual_chart(from_year = 2009, to_year = date.today().year):
         )
     )
 
-    line = altair.Chart(source[source['green'] == 'yes']).mark_line(stroke = '#5276A7', interpolate = 'monotone').encode(
-        altair.X('year', type='ordinal', 
-                axis = altair.Axis(
-                    labelAngle = 0,
-                    labelAlign = 'center',
-                    labelPadding = 7,
-                    )
-                ),
-        altair.Y('percentage',
-                scale = altair.Scale(domain = (0,100)),
-                axis = altair.Axis(
-                    title = 'Percentage of green domains (%)', 
-                    titleColor = '#5276A7',
-                    grid = True,
-                    orient = 'left',
-                ),
-        ),
-    )
-
-    return altair.layer(bar, line).resolve_scale(
+    return altair.layer(bar_chart).resolve_scale(
         y = 'independent'
     ).properties(
-        title = "Greencheck annual overview - " + from_year + " to " + to_year,
+        title = graph_title,
 
-        width = 800,
+        width = 1000,
         height = 400,
     ).configure_legend(
         labelFontSize = 12,
@@ -91,7 +101,7 @@ def retrieve_annual_chart(from_year = 2009, to_year = date.today().year):
         orient = 'none',
         direction = 'horizontal',
         titleOrient = 'left',
-        legendX = 250,
+        legendX = 450,
         legendY = -20,
     ).configure_axis(
         labelFontSize = 13,
@@ -100,35 +110,49 @@ def retrieve_annual_chart(from_year = 2009, to_year = date.today().year):
         fontSize = 18,
     )
 
-def retrieve_monthly_chart(from_year = 2017, to_year = date.today().year):
-    chart_width = 1000
-    column_width = chart_width/(to_year - from_year)
-    from_year = str(from_year)
-    to_year = str(to_year)
+def retrieve_monthly_chart(tld = None):
+    dataset_location = './stats/static/datasets/monthly.lookups.parquet'
+    start_year = 2009
+    end_year = 2021
 
+    # Calculate the graph size based on the number of years it will show
+    final_chart_width = 800
+    column_width = final_chart_width/(start_year - end_year)
+
+    if (tld and tld != 'global'):
+        # Query based on Top-Level Domain (TLD)
+        query = "SELECT * FROM '{}' WHERE year >= {} AND year <= {} AND tld = '{}'".format(dataset_location, start_year, end_year, tld)
+        graph_title = "Greencheck monthly overview for .{} - {} to {}".format(tld, start_year, end_year),
+    else:
+        # No TLD specified, so query all TLDs
+        query = "SELECT year, month, green, sum(look_ups) AS look_ups FROM '{}' WHERE year >= {} AND year <= {} GROUP BY year, month, green".format(dataset_location, start_year, end_year)
+        graph_title = "Greencheck monthly overview - {} to {}".format(start_year, end_year),
+
+    # Initialize a connection with DuckDB and retrieve data
     conn = duckdb.connect()
-    source  = conn.execute("SELECT * FROM './stats/static/datasets/monthly.lookups.parquet' WHERE year >= " + from_year + " AND year <= " + to_year).df()
+    source = conn.execute(query).df()
 
+    # Convert the numbers of lookups to a more readable size
     source['look_ups'] = source['look_ups']/1000000
 
     return altair.Chart(source).mark_bar().encode(
-        altair.X('month', 
-                title = '', 
-                type = 'ordinal',
+        altair.X('month', title = '', type = 'ordinal',
                 axis = altair.Axis(
                     labelAngle = 0,
                     labelAlign = 'center',
                     labelPadding = 0,
-                    tickCount = 5,
+                    tickCount = 3,
                     )
                 ),
-        altair.Column('year:O', 
-                    title = "Greencheck monthly overview - " + from_year + " to " + to_year,
-                    spacing = 3,
-                    header = altair.Header(titleFontSize = 15, labelFontSize = 13, titlePadding = 20)),
+        altair.Column('year:O', title = graph_title,spacing = 2,
+                    header = altair.Header(
+                        titleFontSize = 15, 
+                        labelFontSize = 13, 
+                        titlePadding = 20
+                        )
+                    ),
         altair.Y('look_ups', title = 'Millions of lookups'),
-        altair.Color('green', 
-                    title = 'Green',
+        altair.Color('green', title = 'Green',
                     scale = altair.Scale(
                         domain = ['yes', 'no'],
                         range = ['#C3E3A6', '#CECCCA']
@@ -145,7 +169,7 @@ def retrieve_monthly_chart(from_year = 2017, to_year = date.today().year):
         orient = 'none',
         direction = 'horizontal',
         titleOrient = 'left',
-        legendX = chart_width/2,
+        legendX = final_chart_width/2,
         legendY = -50,
     ).properties(
         width = column_width,

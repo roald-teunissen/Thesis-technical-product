@@ -25,7 +25,8 @@ SECRET_KEY = 'f(!((6frrk@42n#9yth5%j@sx3#aicj22&5jra$^)cg7*5+5ey'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
+TAILWIND_APP_NAME = 'theme'
 
 
 # Application definition
@@ -39,6 +40,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'blog.apps.BlogConfig',
     'stats.apps.StatsConfig',
+    'django_htmx',
+    'tailwind',
+    'theme',
+    'django_browser_reload',
 ]
 
 MIDDLEWARE = [
@@ -49,6 +54,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_htmx.middleware.HtmxMiddleware',
+    'django_browser_reload.middleware.BrowserReloadMiddleware',
 ]
 
 ROOT_URLCONF = 'mysite.urls'
@@ -101,6 +108,12 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Internal IPs
+# As required by Tailwind
+
+INTERNAL_IPS = [
+    "127.0.0.1",
+]
 
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/
