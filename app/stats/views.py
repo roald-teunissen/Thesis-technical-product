@@ -67,12 +67,16 @@ def retrieve_annual_chart(tld = None):
     base = altair.Chart(source).encode(altair.X('year:O'))
 
     bar_chart = altair.Chart(source).mark_bar().encode(
-        altair.X('year', title = 'Years', type = 'ordinal'),
+        altair.X('year', title = 'Years', type = 'ordinal', 
+                axis = altair.Axis(
+                    labelAngle = 0
+                    )
+                ),
         altair.Y('look_ups', title = 'lookups', 
                 axis = altair.Axis(
                     title = 'Millions of lookups',
                     titleColor = '#97CE64',
-                    orient = 'right',
+                    # orient = 'right',
                 ),
             ),
         altair.Color('green', title = 'Green',
@@ -88,7 +92,7 @@ def retrieve_annual_chart(tld = None):
     ).properties(
         title = graph_title,
 
-        width = 800,
+        width = 1000,
         height = 400,
     ).configure_legend(
         labelFontSize = 12,
@@ -97,7 +101,7 @@ def retrieve_annual_chart(tld = None):
         orient = 'none',
         direction = 'horizontal',
         titleOrient = 'left',
-        legendX = 250,
+        legendX = 450,
         legendY = -20,
     ).configure_axis(
         labelFontSize = 13,
@@ -121,7 +125,7 @@ def retrieve_monthly_chart(tld = None):
         graph_title = "Greencheck monthly overview for .{} - {} to {}".format(tld, start_year, end_year),
     else:
         # No TLD specified, so query all TLDs
-        query = "SELECT year, green, sum(look_ups) AS look_ups FROM '{}' WHERE year >= {} AND year <= {} GROUP BY year, green".format(dataset_location, start_year, end_year)
+        query = "SELECT year, month, green, sum(look_ups) AS look_ups FROM '{}' WHERE year >= {} AND year <= {} GROUP BY year, month, green".format(dataset_location, start_year, end_year)
         graph_title = "Greencheck monthly overview - {} to {}".format(start_year, end_year),
 
     # Initialize a connection with DuckDB and retrieve data
@@ -137,10 +141,10 @@ def retrieve_monthly_chart(tld = None):
                     labelAngle = 0,
                     labelAlign = 'center',
                     labelPadding = 0,
-                    tickCount = 5,
+                    tickCount = 3,
                     )
                 ),
-        altair.Column('year:O', title = graph_title,spacing = 1,
+        altair.Column('year:O', title = graph_title,spacing = 2,
                     header = altair.Header(
                         titleFontSize = 15, 
                         labelFontSize = 13, 
